@@ -104,26 +104,51 @@ struct PanelView: View {
     }
 
     private var controls: some View {
-        HStack {
-            Button {
-                model.toggle()
-            } label: {
-                Label(model.running ? "Stop" : "Start",
-                      systemImage: model.running ? "stop.fill" : "play.fill")
-                    .frame(maxWidth: .infinity)
-            }
-            .controlSize(.large)
-            .keyboardShortcut(.defaultAction)
-            .tint(model.running ? .red : .green)
-            .buttonStyle(.borderedProminent)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Button {
+                    model.toggle()
+                } label: {
+                    Label(model.running ? "Stop" : "Start",
+                          systemImage: model.running ? "stop.fill" : "play.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .controlSize(.large)
+                .keyboardShortcut(.defaultAction)
+                .tint(model.running ? .red : .green)
+                .buttonStyle(.borderedProminent)
+                .disabled(model.autosyncInProgress)
 
-            Button {
-                NSApplication.shared.terminate(nil)
-            } label: {
-                Image(systemName: "power")
+                Button {
+                    model.autosync()
+                } label: {
+                    Label(
+                        model.autosyncInProgress ? "Syncing…" : "Autosync",
+                        systemImage: "waveform.badge.magnifyingglass"
+                    )
+                }
+                .controlSize(.large)
+                .disabled(!model.running
+                          || model.enabledDevices.count < 2
+                          || model.autosyncInProgress
+                          || model.isPreview)
+                .help("Play short chirps and use the mic to align delays. Place the Mac near where you listen.")
+
+                Button {
+                    NSApplication.shared.terminate(nil)
+                } label: {
+                    Image(systemName: "power")
+                }
+                .controlSize(.large)
+                .help("Quit SoundStage")
+                .disabled(model.autosyncInProgress)
             }
-            .controlSize(.large)
-            .help("Quit SoundStage")
+
+            if let name = model.autosyncProgress {
+                Text("Syncing \(name)…")
+                    .font(.caption)
+                    .foregroundStyle(CaptureTheme.secondary)
+            }
         }
     }
 }
