@@ -37,6 +37,9 @@ struct PanelView: View {
             }
             controls
             if !CaptureTheme.active {
+                Text("⌃⌥/ · toggle mixer")
+                    .font(.caption.monospaced())
+                    .foregroundStyle(CaptureTheme.secondary)
                 Button("Menu Bar Settings…") {
                     AppDelegate.openMenuBarSettings()
                 }

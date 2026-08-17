@@ -7,20 +7,41 @@ import SoundStageCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let model = AppModel()
     private var mixerPanel: NSPanel?
+    private let hotKey = GlobalHotKey()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Accessory = no Dock icon. Open the mixer so the app is findable even
         // when macOS 26 hides the menu-bar item.
         NSApp.setActivationPolicy(.accessory)
         showMixerPanel()
+        hotKey.install { [weak self] in
+            self?.hotKeyAction()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        hotKey.uninstall()
         Engine.shared.stop()
+    }
+
+    /// ⌃⌥/: show the mixer panel if hidden; hide it if visible (app keeps running).
+    func hotKeyAction() {
+        if let mixerPanel, mixerPanel.isVisible {
+            mixerPanel.orderOut(nil)
+            return
+        }
+        showMixerPanel()
     }
 
     func showMixerPanel() {
         if let mixerPanel, mixerPanel.isVisible {
+            mixerPanel.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        // Re-show an existing panel that was closed / ordered out.
+        if let mixerPanel {
             mixerPanel.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
