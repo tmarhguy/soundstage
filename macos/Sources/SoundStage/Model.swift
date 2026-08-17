@@ -12,12 +12,17 @@ final class AppModel: ObservableObject {
     @Published var settings = Settings()
     /// True when Gatekeeper is running us from a translocated (Downloads) copy.
     @Published var isTranslocated = false
+    /// Non-nil while Autosync is measuring; holds the device name being probed.
+    @Published var autosyncProgress: String?
 
     private let engine = Engine.shared
     private var meterTimer: Timer?
     private var captureHealthWork: [DispatchWorkItem] = []
     private var restartWork: DispatchWorkItem?
+    private var autosyncTask: Task<Void, Never>?
     let isPreview: Bool
+
+    var autosyncInProgress: Bool { autosyncProgress != nil }
 
     static let translocationMessage = """
         SoundStage was opened from Downloads/Desktop, so macOS isolated it (App Translocation) and System Audio Recording permission can’t stick.
@@ -136,6 +141,9 @@ final class AppModel: ObservableObject {
     }
 
     func stop() {
+        autosyncTask?.cancel()
+        autosyncTask = nil
+        autosyncProgress = nil
         cancelCaptureHealthCheck()
         settings.wasRunning = false
         save()
@@ -147,19 +155,75 @@ final class AppModel: ObservableObject {
     func toggle() { running ? stop() : start() }
 
     func shutdown() {
+        autosyncTask?.cancel()
+        autosyncTask = nil
+        autosyncProgress = nil
         cancelCaptureHealthCheck()
         engine.stop()
     }
 
     /// Debounced restart after structural changes (device set, clock).
     func restartIfRunning() {
-        guard running else { return }
+        guard running, !autosyncInProgress else { return }
         restartWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
-            Task { @MainActor in self?.start() }
+            Task { @MainActor in
+                guard let self, !self.autosyncInProgress else { return }
+                self.start()
+            }
         }
         restartWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
+    }
+
+    // MARK: - Autosync
+
+    func autosync() {
+        guard !isPreview, !autosyncInProgress else { return }
+        autosyncTask?.cancel()
+        autosyncTask = Task { @MainActor in
+            await self.runAutosync()
+        }
+    }
+
+    private func runAutosync() async {
+        errorMessage = nil
+        let list = enabledDevices
+        guard running, engine.running else {
+            errorMessage = AutoSyncError.notRunning.localizedDescription
+            return
+        }
+        guard list.count >= 2 else {
+            errorMessage = AutoSyncError.needTwoDevices.localizedDescription
+            return
+        }
+
+        restartWork?.cancel()
+        autosyncProgress = "Starting…"
+        do {
+            let delays = try await AutoSyncRunner.run(
+                engine: engine,
+                devices: list,
+                onProgress: { [weak self] name in
+                    self?.autosyncProgress = name
+                }
+            )
+            for (uid, ms) in delays {
+                settings.delayMs[uid] = ms
+                engine.setDevice(uid: uid, delayMs: ms)
+            }
+            save()
+            autosyncProgress = nil
+        } catch is CancellationError {
+            autosyncProgress = nil
+        } catch let err as AutoSyncError {
+            autosyncProgress = nil
+            if case .cancelled = err { return }
+            errorMessage = err.localizedDescription
+        } catch {
+            autosyncProgress = nil
+            errorMessage = error.localizedDescription
+        }
     }
 
     // MARK: - Capture health (silent TCC / post-grant relaunch)
@@ -257,7 +321,7 @@ final class AppModel: ObservableObject {
         // Auto-rejoin: if the set of devices the engine should be driving
         // (enabled + currently present) no longer matches what it is driving —
         // a device reconnected or vanished — restart with the current set.
-        if running {
+        if running, !autosyncInProgress {
             let want = Set(enabledDevices.map(\.uid))
             let have = Set(engine.slots.map(\.uid))
             if want != have && !want.isEmpty {
