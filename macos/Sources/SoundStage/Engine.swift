@@ -214,12 +214,28 @@ final class Engine {
     private var ringFrames = 0
     private var writeIndex = 0   // audio-thread only
 
+    // Latency measure: mute tap passthrough and inject a mono probe into the ring.
+    private let passthroughMute: UnsafeMutablePointer<Int32> = .allocate(capacity: 1)
+    private let probeIndex: UnsafeMutablePointer<Int32> = .allocate(capacity: 1)
+    private var probe: UnsafeMutablePointer<Float>?
+    private var probeFrameCount = 0
+    private var measureSnapshot: [DeviceConfig] = []
+    private var measureSavedMaster: Float = 1
+
     private init() {
         masterGain.pointee = 1
         inputRms.pointee = 0
         sawInputFlag.pointee = 0
         callbackCount.pointee = 0
+        passthroughMute.pointee = 0
+        probeIndex.pointee = -1
     }
+
+    /// True while Autosync has muted system-audio passthrough.
+    var isMeasuring: Bool { passthroughMute.pointee != 0 }
+
+    /// True when no probe is currently being written into the ring.
+    var isProbeIdle: Bool { probeIndex.pointee < 0 }
 
     /// True once the tap has delivered at least one non-silent buffer this session.
     var hasReceivedAudio: Bool { sawInputFlag.pointee != 0 }
@@ -332,6 +348,8 @@ final class Engine {
         let slotsRef = slots
         let masterPtr = masterGain
         let inputRmsPtr = inputRms
+        let mutePtr = passthroughMute
+        let probeIdxPtr = probeIndex
 
         status = AudioDeviceCreateIOProcIDWithBlock(&ioProcID, aggregateID, nil) {
             [weak self] _, inInputData, _, outOutputData, _ in
@@ -341,13 +359,39 @@ final class Engine {
             let inABL = UnsafeMutableAudioBufferListPointer(UnsafeMutablePointer(mutating: inInputData))
             let outABL = UnsafeMutableAudioBufferListPointer(outOutputData)
 
-            // Tap input -> stereo ring
+            // Tap input -> stereo ring (or probe / silence while measuring)
             var frames = 0
-            if inABL.count >= 1, let d0 = inABL[0].mData {
+            if inABL.count >= 1, inABL[0].mData != nil {
+                let ch = Int(inABL[0].mNumberChannels)
+                if ch >= 2 {
+                    frames = Int(inABL[0].mDataByteSize) / (4 * ch)
+                } else if ch == 1 && inABL.count >= 2 {
+                    frames = Int(inABL[0].mDataByteSize) / 4
+                }
+            }
+
+            if mutePtr.pointee != 0 {
+                // Measure mode: write probe samples (or silence) into the ring.
+                let probePtr = self.probe
+                let probeLen = self.probeFrameCount
+                for f in 0..<frames {
+                    var s: Float = 0
+                    let pi = probeIdxPtr.pointee
+                    if pi >= 0, let probePtr, pi < probeLen {
+                        s = probePtr[Int(pi)]
+                        probeIdxPtr.pointee = pi + 1
+                    } else if pi >= probeLen {
+                        probeIdxPtr.pointee = -1
+                    }
+                    let w = ((self.writeIndex + f) % ringLen) * 2
+                    ringPtr[w] = s
+                    ringPtr[w + 1] = s
+                }
+                inputRmsPtr.pointee = 0
+            } else if frames > 0, inABL.count >= 1, let d0 = inABL[0].mData {
                 let ch = Int(inABL[0].mNumberChannels)
                 if ch >= 2 {
                     let src = d0.assumingMemoryBound(to: Float.self)
-                    frames = Int(inABL[0].mDataByteSize) / (4 * ch)
                     var sumSq: Float = 0
                     for f in 0..<frames {
                         let l = src[f * ch], r = src[f * ch + 1]
@@ -355,24 +399,19 @@ final class Engine {
                         ringPtr[w] = l; ringPtr[w + 1] = r
                         sumSq += l * l + r * r
                     }
-                    if frames > 0 {
-                        inputRmsPtr.pointee = (sumSq / Float(frames * 2)).squareRoot()
-                        if sumSq > 0 { self.sawInputFlag.pointee = 1 }
-                    }
+                    inputRmsPtr.pointee = (sumSq / Float(frames * 2)).squareRoot()
+                    if sumSq > 0 { self.sawInputFlag.pointee = 1 }
                 } else if ch == 1 && inABL.count >= 2, let d1 = inABL[1].mData {
                     let l = d0.assumingMemoryBound(to: Float.self)
                     let r = d1.assumingMemoryBound(to: Float.self)
-                    frames = Int(inABL[0].mDataByteSize) / 4
                     var sumSq: Float = 0
                     for f in 0..<frames {
                         let w = ((self.writeIndex + f) % ringLen) * 2
                         ringPtr[w] = l[f]; ringPtr[w + 1] = r[f]
                         sumSq += l[f] * l[f] + r[f] * r[f]
                     }
-                    if frames > 0 {
-                        inputRmsPtr.pointee = (sumSq / Float(frames * 2)).squareRoot()
-                        if sumSq > 0 { self.sawInputFlag.pointee = 1 }
-                    }
+                    inputRmsPtr.pointee = (sumSq / Float(frames * 2)).squareRoot()
+                    if sumSq > 0 { self.sawInputFlag.pointee = 1 }
                 }
             }
             let base = self.writeIndex
@@ -441,12 +480,68 @@ final class Engine {
 
     func setMaster(_ gain: Float) { masterGain.pointee = max(0, min(2, gain)) }
 
+    // MARK: - Latency measure
+
+    /// Mute system-audio passthrough, zero delays, load a mono probe for injection.
+    func beginLatencyMeasure(chirp: [Float]) {
+        guard running else { return }
+        measureSnapshot = slots.map {
+            DeviceConfig(uid: $0.uid, gain: $0.gain.pointee, delayMs: Float($0.delayFrames.pointee) * 1000 / Float(sampleRate))
+        }
+        measureSavedMaster = masterGain.pointee
+        masterGain.pointee = 1
+        for slot in slots {
+            slot.delayFrames.pointee = 0
+        }
+        if let old = probe { old.deallocate() }
+        probeFrameCount = chirp.count
+        if chirp.isEmpty {
+            probe = nil
+        } else {
+            probe = .allocate(capacity: chirp.count)
+            for i in 0..<chirp.count { probe![i] = chirp[i] }
+        }
+        probeIndex.pointee = -1
+        passthroughMute.pointee = 1
+    }
+
+    /// Solo one output at `gain`; silence the rest (measure only).
+    func soloForMeasure(uid: String, gain: Float = 1.0) {
+        for slot in slots {
+            slot.gain.pointee = slot.uid == uid ? max(0, min(2, gain)) : 0
+        }
+    }
+
+    /// Start writing the loaded chirp into the ring on the next IO cycle.
+    func scheduleProbe() {
+        guard probe != nil, probeFrameCount > 0 else { return }
+        probeIndex.pointee = 0
+    }
+
+    /// Restore gains/delays/master from the snapshot taken in `beginLatencyMeasure`.
+    func endLatencyMeasure() {
+        passthroughMute.pointee = 0
+        probeIndex.pointee = -1
+        if let p = probe { p.deallocate(); probe = nil }
+        probeFrameCount = 0
+        masterGain.pointee = measureSavedMaster
+        for cfg in measureSnapshot {
+            setDevice(uid: cfg.uid, gain: cfg.gain, delayMs: cfg.delayMs)
+        }
+        measureSnapshot = []
+    }
+
     func stop() {
+        if isMeasuring { endLatencyMeasure() }
         guard running || tapID != kAudioObjectUnknown else { return }
         cleanupProc()
         cleanupAggregate()
         cleanupTap()
         if let r = ring { r.deallocate(); ring = nil }
+        if let p = probe { p.deallocate(); probe = nil }
+        probeFrameCount = 0
+        probeIndex.pointee = -1
+        passthroughMute.pointee = 0
         for slot in slots { slot.rms.pointee = 0 }
         inputRms.pointee = 0
         sawInputFlag.pointee = 0
