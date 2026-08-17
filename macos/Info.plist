@@ -26,5 +26,7 @@
 	<true/>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>SoundStage captures system audio in order to route it to your selected output devices.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>SoundStage uses the microphone once during Autosync to measure speaker delay. Audio is not recorded or stored.</string>
 </dict>
 </plist>
