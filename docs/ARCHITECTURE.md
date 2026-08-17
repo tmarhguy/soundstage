@@ -10,11 +10,9 @@ macos/
 ├── AppIcon.icns
 ├── make-app.sh              swift build → assemble .app → ad-hoc codesign
 ├── install.sh               optional: copy local build to /Applications
-└── Sources/SoundStage/
-    ├── App.swift            @main MenuBarExtra scene + --capture dev mode
-    ├── Model.swift          AppModel: settings, persistence, hot-plug, meters
-    ├── PanelView.swift      SwiftUI mixer panel
-    └── Engine.swift         Core Audio: tap → aggregate → render callback
+├── Sources/SoundStageCore/  testable policy (enable, clock, settings)
+├── Sources/SoundStage/      app + Core Audio engine
+└── Tests/SoundStageTests/   XCTest on SoundStageCore (no HAL / TCC)
 ```
 
 ## The audio path

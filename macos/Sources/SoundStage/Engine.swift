@@ -131,12 +131,6 @@ func listOutputDevices() -> [AudioDevice] {
     return result
 }
 
-/// Gatekeeper App Translocation: quarantined apps opened from Downloads/Desktop
-/// run from a random read-only path. TCC grants then fail to stick / apply.
-func isRunningFromAppTranslocation() -> Bool {
-    Bundle.main.bundlePath.contains("/AppTranslocation/")
-}
-
 /// True if some other process is actively playing audio (used to distinguish
 /// "nothing is playing" from "tap is authorized but delivering silence").
 func anyOtherProcessPlayingOutput() -> Bool {

@@ -1,16 +1,7 @@
 import Foundation
 import Combine
 import CoreAudio
-
-struct Settings: Codable {
-    var enabled: [String: Bool] = [:]
-    var gain: [String: Float] = [:]
-    var delayMs: [String: Float] = [:]
-    var mute: [String: Bool] = [:]
-    var master: Float = 1
-    var masterUid: String? = nil
-    var wasRunning: Bool = false
-}
+import SoundStageCore
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -65,7 +56,7 @@ final class AppModel: ObservableObject {
         }
         refreshDevices()
         guard !preview else { return }
-        isTranslocated = isRunningFromAppTranslocation()
+        isTranslocated = isAppTranslocationPath(Bundle.main.bundlePath)
         if isTranslocated {
             errorMessage = Self.translocationMessage
         }
@@ -93,37 +84,26 @@ final class AppModel: ObservableObject {
         devices.filter { isEnabled($0) }
     }
 
-    /// Explicit setting wins; otherwise on — except HDMI/DP, which often break
-    /// private aggregates on macOS 26 (IO never starts). Those are opt-in.
     func isEnabled(_ device: AudioDevice) -> Bool {
-        if let explicit = settings.enabled[device.uid] { return explicit }
-        if device.transport == "hdmi" || device.transport == "displayport" {
-            return false
-        }
-        return true
+        isDeviceEnabled(uid: device.uid, transport: device.transport, enabled: settings.enabled)
     }
 
     var effectiveMasterUid: String? {
-        let enabled = enabledDevices
-        if let uid = settings.masterUid, enabled.contains(where: { $0.uid == uid }) {
-            return uid
-        }
-        // Prefer a wired clock: builtin > hdmi/dp/usb > anything
-        let pick = enabled.first { $0.transport == "builtin" }
-            ?? enabled.first { ["hdmi", "displayport", "usb"].contains($0.transport) }
-            ?? enabled.first
-        return pick?.uid
+        preferredClockUid(
+            enabled: enabledDevices.map { DeviceRef(uid: $0.uid, transport: $0.transport) },
+            current: settings.masterUid
+        )
     }
 
     func effectiveGain(_ uid: String) -> Float {
-        (settings.mute[uid] ?? false) ? 0 : (settings.gain[uid] ?? 1)
+        SoundStageCore.effectiveGain(uid: uid, gain: settings.gain, mute: settings.mute)
     }
 
     // MARK: - Engine control
 
     func start() {
         errorMessage = nil
-        isTranslocated = isRunningFromAppTranslocation()
+        isTranslocated = isAppTranslocationPath(Bundle.main.bundlePath)
         if isTranslocated {
             errorMessage = Self.translocationMessage
             return

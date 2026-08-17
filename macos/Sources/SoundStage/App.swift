@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
+import SoundStageCore
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {

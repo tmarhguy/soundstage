@@ -15,6 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Test
+        run: swift test --package-path macos
+
       - name: Build SoundStage.app
         run: ./macos/make-app.sh
 
