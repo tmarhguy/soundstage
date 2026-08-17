@@ -23,6 +23,7 @@ macOS lets you pick *one* output device. SoundStage removes that limit: your mon
 - 🔊 **All devices at once** — HDMI/DisplayPort monitors, Bluetooth speakers, built-in speakers, USB interfaces, AirPlay
 - 🎚 **Per-device volume** (0–150%) plus master volume — something macOS multi-output can't do at all
 - ⏱ **Per-device delay** (0–750 ms) — Bluetooth speakers lag behind wired ones; delay the wired outputs until the echo collapses into a single sound
+- 🎯 **Autosync** — one-shot mic measurement that fills in those delays for you ([guide](docs/AUTOSYNC.md))
 - 📊 **Live level meters** for every device
 - 🔌 **Auto-rejoin** — a Bluetooth speaker that reconnects automatically rejoins the mix
 - ▶️ **Auto-resume** — quit while routing, and the next launch (or reboot, as a Login Item) picks up exactly where you left off
@@ -59,11 +60,16 @@ cd soundstage && ./macos/make-app.sh && ./macos/install.sh
 
 ### Getting devices in sync
 
-Bluetooth adds 100–300 ms of latency, so a Bluetooth speaker will echo behind wired outputs. You can't make Bluetooth faster — so make the others later:
+Bluetooth adds 100–300 ms of latency, so a Bluetooth speaker will echo behind wired outputs. You can't make Bluetooth faster — so make the others later: delay the *fast* (wired) devices until they line up with the *slow* one.
 
-> Play music → drag the **DLY** slider **up on the wired devices** (start around 150–200 ms) until the echo disappears.
+<div align="center">
+<img src="assets/autosync.png" width="320" alt="SoundStage mixer with Autosync: Built-in speakers delayed 200 ms to match a Bluetooth speaker at 0 ms" />
+<p><sub>After Autosync: Bluetooth stays at 0 ms; the faster Built-in output is delayed (~200 ms here) so both hit your ears together.</sub></p>
+</div>
 
-Leave **Clock** on a wired device (built-in speakers are ideal). The clock device is the timing reference the others are drift-corrected against — Bluetooth clocks wander too much to lead.
+**→ Full guide:** [docs/AUTOSYNC.md](docs/AUTOSYNC.md) — when to use it, what you’ll hear, permissions, tips, FAQ, and troubleshooting.
+
+**In short:** with routing live and ≥ 2 devices enabled, sit where you listen → **Autosync** → allow the mic → short chirps per speaker → **DLY** fills in (nearest ms). Re-run if echo returns. Or drag **DLY** on wired devices by ear (often 150–200 ms to start). Prefer a **wired Clock** for day-to-day stability.
 
 ### Start on boot
 
@@ -85,12 +91,35 @@ flowchart LR
 
 SoundStage creates a **global Core Audio process tap** (`CATapDescription`, macOS 14.4+) that captures every process's audio and simultaneously mutes it at the hardware — so sound only reaches the devices *you* choose, with no doubling. The tap feeds a **private aggregate device** containing your selected outputs; Core Audio drift-corrects each device against the clock device, and the engine's realtime callback applies per-device gain, delay (a shared ring buffer read at per-device offsets), and RMS metering. No kernel extensions, no virtual audio drivers, no installers.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the deep dive.
+### Autosync
+
+One-shot mic calibration that fills **DLY** automatically. Full user guide (how to use it, what happens, troubleshooting): **[docs/AUTOSYNC.md](docs/AUTOSYNC.md)**.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Panel
+    participant Engine
+    participant Mic
+    participant Core as LatencyMeasure
+
+    User->>Panel: Autosync
+    Panel->>Engine: mute passthrough, zero delays
+    loop each enabled output
+        Panel->>Engine: solo device + inject chirp
+        Mic->>Panel: record default input
+        Panel->>Core: cross-correlate chirp vs mic
+        Core-->>Panel: arrival time
+    end
+    Panel->>Engine: restore mix, apply relative DLY
+```
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the deep dive (including Autosync measure mode).
 
 ## Limitations
 
 - Audio is captured as a **stereo mixdown** — multichannel sources are folded to stereo before distribution
-- Bluetooth latency **varies over time**; a delay that's perfect now may drift by tens of ms during a session
+- Bluetooth latency **varies over time**; a delay that's perfect now may drift by tens of ms during a session (re-run **Autosync** or nudge **DLY** — see [docs/AUTOSYNC.md](docs/AUTOSYNC.md))
 - Requires **macOS 14.4+** (the process-tap API is recent); Apple Silicon
 - While routing is active, the volume keys control SoundStage's devices only via the panel (the system volume HUD is bypassed)
 

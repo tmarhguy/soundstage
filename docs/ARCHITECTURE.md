@@ -6,7 +6,7 @@ project — plain SwiftPM (`macos/Package.swift`) plus a bundling script.
 ```
 macos/
 ├── Package.swift            SPM manifest (macOS 14.4+)
-├── Info.plist               LSUIElement, NSAudioCaptureUsageDescription
+├── Info.plist               LSUIElement, audio + microphone usage strings
 ├── AppIcon.icns
 ├── make-app.sh              swift build → assemble .app → ad-hoc codesign
 ├── install.sh               optional: copy local build to /Applications
@@ -108,6 +108,34 @@ Delaying a device just moves its read offset back. The UI exposes this as
 "delay the *fast* (wired) devices to match the *slow* (Bluetooth) one" —
 you can't time-travel Bluetooth forward.
 
+### 3b. Autosync (one-shot mic calibration)
+
+`AutoSyncRunner` drives a temporary **measure mode** on the engine:
+
+1. **`beginLatencyMeasure(chirp:)`** — snapshot gains/delays/master, force
+   delays to 0, mute tap passthrough into the ring, load a precomputed mono
+   chirp buffer.
+2. **`soloForMeasure(uid:)`** — DUT gain up, all other slots zero.
+3. **`scheduleProbe()`** — audio thread writes chirp samples into the ring
+   (L=R) instead of silence; only the soloed device reproduces them.
+4. **`MicRecorder`** (`AVAudioEngine` input tap on the default mic) captures
+   the room while each probe plays.
+5. **`SoundStageCore.estimateDelayMs`** — normalized cross-correlation with
+   earliest-strong-peak selection, parabolic sub-sample interpolation, then
+   `relativeDelaysMs` (slowest → 0, others delayed, rounded to nearest ms).
+6. **`endLatencyMeasure()`** — restore the mix; the model writes the new
+   `delayMs` map into settings + live slot pointers.
+
+Failures are all-or-nothing (mic denial, low confidence, too-short capture):
+the snapshot is restored and no partial delay set is persisted. A second
+attempt at higher probe gain runs automatically per device before giving up.
+
+Pure math lives in `SoundStageCore/LatencyMeasure.swift` so XCTest can cover
+chirps, reflections, noise rejection, and nearest-ms quantization without
+touching Core Audio or TCC.
+
+**User-facing guide:** [AUTOSYNC.md](AUTOSYNC.md).
+
 ### 4. Teardown
 
 `stop()` destroys IOProc → aggregate → tap, in that order. Destroying the tap
@@ -121,6 +149,10 @@ by `coreaudiod`, so there's no way to leave the system muted.
   (JSON-encoded in `UserDefaults`), listens for device hot-plug
   (`kAudioHardwarePropertyDevices`), polls meters at 8 Hz, and debounces
   engine restarts when the device set or clock changes.
+- **Autosync:** `autosync()` runs `AutoSyncRunner` on a task; UI shows
+  `Syncing Device…` and blocks Start/Stop/Quit/restart-while-measuring.
+  Requires Microphone TCC (`NSMicrophoneUsageDescription`) in addition to
+  System Audio Recording.
 - **Auto-rejoin:** on every device-list change, if the engine is running and
   `enabled ∩ present` differs from what the engine is driving, it restarts
   with the current set — so a reconnecting Bluetooth speaker rejoins.
@@ -135,5 +167,5 @@ by `coreaudiod`, so there's no way to leave the system muted.
 The classic approach (BlackHole, Loopback) installs an `AudioServerPlugIn` —
 an installer, admin rights, and for distribution Apple's audio-driver
 entitlement. Process taps do the same job for this use case with **zero
-install surface**: one TCC permission prompt, and dragging the app to the
-Trash removes every trace.
+install surface**: TCC prompts for system audio (and microphone only if you
+use Autosync), and dragging the app to the Trash removes every trace.
