@@ -28,6 +28,7 @@ macOS lets you pick *one* output device. SoundStage removes that limit: your mon
 - 🔌 **Auto-rejoin** — a Bluetooth speaker that reconnects automatically rejoins the mix
 - ▶️ **Auto-resume** — quit while routing, and the next launch (or reboot, as a Login Item) picks up exactly where you left off
 - 🫥 **Menu bar native** — SwiftUI `MenuBarExtra`, no Dock icon, ~2 MB, zero dependencies
+- ⌨️ **Global hotkey** — **⌃⌥/** shows or hides the mixer while running ([guide](docs/HOTKEY.md))
 
 ## Install
 
@@ -41,7 +42,7 @@ xattr -dr com.apple.quarantine /Applications/SoundStage.app
 
 …or right-click the app → **Open** → **Open**.
 
-SoundStage has **no Dock icon**. On launch it opens a small mixer window; look near the clock for **SoundStage** as well. On macOS 26, if the menu-bar item is missing, turn it on under **System Settings → Menu Bar** (or use **Menu Bar Settings…** in the mixer).
+SoundStage has **no Dock icon**. On launch it opens a small mixer window; look near the clock for **SoundStage** as well. While it’s running, **⌃⌥/** (Control–Option–Slash) shows or hides that mixer from any app — see [docs/HOTKEY.md](docs/HOTKEY.md) (including cold start via Shortcuts). On macOS 26, if the menu-bar item is missing, turn it on under **System Settings → Menu Bar** (or use **Menu Bar Settings…** in the mixer).
 
 Then **▶ Start** and allow **System Audio Recording**. If you allowed permission while the app was already running, Quit and reopen once. After a rebuild, if Start is silent but Privacy still looks ON, toggle SoundStage off/on in **Screen & System Audio Recording** (both lists on macOS 26).
 
@@ -73,7 +74,7 @@ Bluetooth adds 100–300 ms of latency, so a Bluetooth speaker will echo behind 
 
 ### Start on boot
 
-Add SoundStage to **System Settings → General → Login Items**. Combined with auto-resume, a reboot brings your whole mix back with zero clicks.
+Add SoundStage to **System Settings → General → Login Items**. Combined with auto-resume, a reboot brings your whole mix back with zero clicks — and **⌃⌥/** can show/hide the mixer anytime the app is running ([hotkey guide](docs/HOTKEY.md)).
 
 ## How it works
 

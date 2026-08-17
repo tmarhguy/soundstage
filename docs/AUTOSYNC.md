@@ -89,25 +89,25 @@ You can’t make a slow device play *earlier*. SoundStage delays the **faster** 
     <tbody>
       <tr>
         <td rowspan="2"><b>Before Autosync</b><br><i>(typical setup)</i></td>
-        <td>🔊 Built-in</td>
+        <td> Built-in</td>
         <td>🟩🟩🟩⬜⬜⬜⬜⬜⬜</td>
         <td>Arrives first</td>
       </tr>
       <tr>
-        <td>🎧 Bluetooth</td>
+        <td> Bluetooth</td>
         <td>⬜⬜⬜⬜⬜⬜🟩🟩🟩</td>
-        <td>Arrives ~200 ms later<br>⚠️ <b>You hear an echo</b></td>
+        <td>Arrives ~200 ms later<br> <b>You hear an echo</b></td>
       </tr>
       <tr>
         <td rowspan="2"><b>After Autosync</b></td>
-        <td>🔊 Built-in</td>
+        <td> Built-in</td>
         <td>⬜⬜⬜⬜⬜⬜🟩🟩🟩</td>
         <td>Delayed ~200 ms</td>
       </tr>
       <tr>
-        <td>🎧 Bluetooth</td>
+        <td> Bluetooth</td>
         <td>⬜⬜⬜⬜⬜⬜🟩🟩🟩</td>
-        <td>Still "late," but aligned<br>✅ <b>One sound</b></td>
+        <td>Still "late," but aligned<br> <b>One sound</b></td>
       </tr>
     </tbody>
   </table>
