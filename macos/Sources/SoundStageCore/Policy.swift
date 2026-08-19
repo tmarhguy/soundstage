@@ -71,3 +71,82 @@ public func preferredClockUid(enabled: [DeviceRef], current: String?) -> String?
         ?? enabled.first
     return pick?.uid
 }
+
+// MARK: - Login item (Open at login)
+
+/// OS Login Item state, mapped from SMAppService without importing ServiceManagement.
+public enum LoginItemStatus: Equatable {
+    case enabled
+    case off
+    case needsApproval
+    case unavailable
+}
+
+/// What Settings should show for Open at login. The OS owns the actual item.
+public struct LoginItemPresentation: Equatable {
+    public var isOn: Bool
+    public var isInteractive: Bool
+    public var caption: String
+    public var showsSystemSettingsLink: Bool
+
+    public init(isOn: Bool, isInteractive: Bool, caption: String, showsSystemSettingsLink: Bool) {
+        self.isOn = isOn
+        self.isInteractive = isInteractive
+        self.caption = caption
+        self.showsSystemSettingsLink = showsSystemSettingsLink
+    }
+}
+
+public let loginItemResumeCaption =
+    "Launches SoundStage after you log in. Routing still resumes only if it was live when you last quit."
+
+public let loginItemTranslocatedCaption =
+    "Move SoundStage to /Applications first — a translocated copy can’t be a login item."
+
+public let loginItemNeedsApprovalCaption =
+    "macOS blocked this login item. Enable SoundStage under System Settings → General → Login Items."
+
+public let loginItemUnavailableCaption =
+    "Open at login needs SoundStage.app in /Applications (not an unpackaged swift run)."
+
+/// Translocated copies cannot register a login item; otherwise map OS status to the toggle.
+public func loginItemPresentation(status: LoginItemStatus, translocated: Bool) -> LoginItemPresentation {
+    if translocated {
+        return LoginItemPresentation(
+            isOn: false,
+            isInteractive: false,
+            caption: loginItemTranslocatedCaption,
+            showsSystemSettingsLink: false
+        )
+    }
+    switch status {
+    case .enabled:
+        return LoginItemPresentation(
+            isOn: true,
+            isInteractive: true,
+            caption: loginItemResumeCaption,
+            showsSystemSettingsLink: false
+        )
+    case .off:
+        return LoginItemPresentation(
+            isOn: false,
+            isInteractive: true,
+            caption: loginItemResumeCaption,
+            showsSystemSettingsLink: false
+        )
+    case .needsApproval:
+        return LoginItemPresentation(
+            isOn: true,
+            isInteractive: false,
+            caption: loginItemNeedsApprovalCaption,
+            showsSystemSettingsLink: true
+        )
+    case .unavailable:
+        return LoginItemPresentation(
+            isOn: false,
+            isInteractive: false,
+            caption: loginItemUnavailableCaption,
+            showsSystemSettingsLink: false
+        )
+    }
+}
