@@ -39,13 +39,13 @@ Skip it (or open from Applications) when:
 
 ## Quick start
 
-1. Launch SoundStage once (from `/Applications`, or let **Login Items** start it at login).
+1. Launch SoundStage once (from `/Applications`, or turn on [Open at login](LOGIN.md)).
 2. From **any** app, press **⌃⌥/** (Control–Option–Slash).
 3. The floating mixer appears (or comes to the front).
 4. Press **⌃⌥/** again → the mixer **hides**; SoundStage stays running (meters, routing, menu bar).
 5. Press **⌃⌥/** again anytime to bring it back.
 
-**Tip:** Add SoundStage under **System Settings → General → Login Items** so it’s usually running and the hotkey stays useful after reboot.
+**Tip:** Turn on **Open at login** so SoundStage is usually running after reboot and the hotkey stays useful — [login guide](LOGIN.md).
 
 ---
 
@@ -111,7 +111,7 @@ Use Apple’s **Shortcuts** app as the system-wide listener:
 
 After that, the chord can **launch** SoundStage from cold. Once the app is running, SoundStage’s own registration also wants **⌃⌥/** for show/hide — if both claim the same keys, behavior can conflict. Prefer either:
 
-- **Same chord, Login Item always on** — keep SoundStage running; rely on in-app toggle day to day; Shortcuts is a backup, or  
+- **Same chord, Open at login always on** — keep SoundStage running; rely on in-app toggle day to day; Shortcuts is a backup, or  
 - **Different chord for Shortcuts** (e.g. cold-start only) — e.g. keep **⌃⌥/** for toggle, use another chord in Shortcuts for “Open SoundStage”
 
 **Automator → Quick Action** + **System Settings → Keyboard → Keyboard Shortcuts** is the same idea on an older path.
@@ -137,7 +137,7 @@ No extra privacy prompt for the in-app hotkey.
 
 ## Tips
 
-- **Login Item** keeps SoundStage alive across reboots so in-app **⌃⌥/** stays available.
+- **Open at login** keeps SoundStage alive across reboots so in-app **⌃⌥/** stays available — [login guide](LOGIN.md).
 - **Hide ≠ quit** — audio keeps playing through SoundStage while the panel is hidden.
 - For true cold start, use [Shortcuts](#cold-start-when-the-app-is-quit) or don’t quit the app.
 - If another utility already stole **⌃⌥/**, the chord may do nothing — rare for this combo.
@@ -150,7 +150,7 @@ No extra privacy prompt for the in-app hotkey.
 |---|---|
 | Chord does nothing | Confirm SoundStage is running. Launch from `/Applications` once. |
 | Wanted to quit, only hid the panel | Use the **power** button in the mixer (or Quit). Hotkey only toggles visibility. |
-| Need launch when fully quit | Set up [Shortcuts cold start](#cold-start-when-the-app-is-quit); or add a Login Item and leave the app running. |
+| Need launch when fully quit | Set up [Shortcuts cold start](#cold-start-when-the-app-is-quit); or [Open at login](LOGIN.md) and leave the app running. |
 | Shortcuts and in-app fight over the same keys | Use different chords, or disable one of them. |
 | Conflict with another app’s shortcut | Quit the other utility, or open an issue requesting a different default. |
 
@@ -159,7 +159,7 @@ No extra privacy prompt for the in-app hotkey.
 ## FAQ
 
 **Why can’t the built-in hotkey launch SoundStage from cold?**  
-It’s registered **inside** the running app. Quit → nothing is listening. macOS has no native “remember this app’s hotkey when dead” for third-party apps. Use **Shortcuts**, a Login Item, or (someday) a helper agent.
+It’s registered **inside** the running app. Quit → nothing is listening. macOS has no native “remember this app’s hotkey when dead” for third-party apps. Use **Shortcuts**, [Open at login](LOGIN.md), or (someday) a helper agent.
 
 **Does hiding the mixer stop audio?**  
 No. Only **Stop** or **Quit** tears down routing.
@@ -177,6 +177,7 @@ No for the in-app Carbon hotkey.
 
 ## Related
 
-- [README](../README.md) — install, Login Items, feature list
+- [README](../README.md) — install, feature list
+- [LOGIN.md](LOGIN.md) — Open at login / start on boot
 - [AUTOSYNC.md](AUTOSYNC.md) — mic-based delay calibration from the mixer
 - [ARCHITECTURE.md](ARCHITECTURE.md) — overall audio path
