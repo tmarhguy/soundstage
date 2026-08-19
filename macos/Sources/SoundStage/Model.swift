@@ -14,6 +14,8 @@ final class AppModel: ObservableObject {
     @Published var isTranslocated = false
     /// Non-nil while Autosync is measuring; holds the device name being probed.
     @Published var autosyncProgress: String?
+    /// Open-at-login toggle state. Derived from `SMAppService`, not UserDefaults.
+    @Published var loginItem = loginItemPresentation(status: .off, translocated: false)
 
     private let engine = Engine.shared
     private var meterTimer: Timer?
@@ -65,6 +67,7 @@ final class AppModel: ObservableObject {
         if isTranslocated {
             errorMessage = Self.translocationMessage
         }
+        refreshLoginItem()
         watchDeviceList()
 
         meterTimer = Timer.scheduledTimer(withTimeInterval: 0.125, repeats: true) { [weak self] _ in
@@ -311,6 +314,29 @@ final class AppModel: ObservableObject {
         settings.masterUid = uid
         save()
         restartIfRunning()
+    }
+
+    // MARK: - Open at login
+
+    func refreshLoginItem() {
+        loginItem = loginItemPresentation(
+            status: LoginItem.status(preview: isPreview),
+            translocated: isTranslocated
+        )
+    }
+
+    func setOpenAtLogin(_ on: Bool) {
+        guard !isPreview, !isTranslocated, loginItem.isInteractive else { return }
+        do {
+            try LoginItem.setEnabled(on)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        refreshLoginItem()
+    }
+
+    func openLoginItemsSettings() {
+        LoginItem.openSystemSettingsLoginItems()
     }
 
     // MARK: - Devices
