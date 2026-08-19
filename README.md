@@ -26,7 +26,8 @@ macOS lets you pick *one* output device. SoundStage removes that limit: your mon
 - 🎯 **Autosync** — one-shot mic measurement that fills in those delays for you ([guide](docs/AUTOSYNC.md))
 - 📊 **Live level meters** for every device
 - 🔌 **Auto-rejoin** — a Bluetooth speaker that reconnects automatically rejoins the mix
-- ▶️ **Auto-resume** — quit while routing, and the next launch (or reboot, as a Login Item) picks up exactly where you left off
+- ▶️ **Auto-resume** — quit while routing, and the next launch (or reboot, with **Open at login**) picks up exactly where you left off ([guide](docs/LOGIN.md))
+- ⚙️ **Settings** — gear on the mixer: **Open at login**, plus a jump to Menu Bar Settings ([guide](docs/LOGIN.md))
 - 🫥 **Menu bar native** — SwiftUI `MenuBarExtra`, no Dock icon, ~2 MB, zero dependencies
 - ⌨️ **Global hotkey** — **⌃⌥/** shows or hides the mixer while running ([guide](docs/HOTKEY.md))
 
@@ -42,7 +43,7 @@ xattr -dr com.apple.quarantine /Applications/SoundStage.app
 
 …or right-click the app → **Open** → **Open**.
 
-SoundStage has **no Dock icon**. On launch it opens a small mixer window; look near the clock for **SoundStage** as well. While it’s running, **⌃⌥/** (Control–Option–Slash) shows or hides that mixer from any app — see [docs/HOTKEY.md](docs/HOTKEY.md) (including cold start via Shortcuts). On macOS 26, if the menu-bar item is missing, turn it on under **System Settings → Menu Bar** (or use **Menu Bar Settings…** in the mixer).
+SoundStage has **no Dock icon**. On launch it opens a small mixer window; look near the clock for **SoundStage** as well. While it’s running, **⌃⌥/** (Control–Option–Slash) shows or hides that mixer from any app — see [docs/HOTKEY.md](docs/HOTKEY.md) (including cold start via Shortcuts). On macOS 26, if the menu-bar item is missing, turn it on under **System Settings → Menu Bar** (or mixer gear → Settings → **Menu Bar Settings…**).
 
 Then **▶ Start** and allow **System Audio Recording**. If you allowed permission while the app was already running, Quit and reopen once. After a rebuild, if Start is silent but Privacy still looks ON, toggle SoundStage off/on in **Screen & System Audio Recording** (both lists on macOS 26).
 
@@ -74,7 +75,9 @@ Bluetooth adds 100–300 ms of latency, so a Bluetooth speaker will echo behind 
 
 ### Start on boot
 
-Add SoundStage to **System Settings → General → Login Items**. Combined with auto-resume, a reboot brings your whole mix back with zero clicks — and **⌃⌥/** can show/hide the mixer anytime the app is running ([hotkey guide](docs/HOTKEY.md)).
+Mixer **gear → Settings → Open at login**. Combined with auto-resume, a reboot brings the mix back with zero clicks.
+
+**→ Full guide:** [docs/LOGIN.md](docs/LOGIN.md) — what the toggle does vs auto-resume, approval, translocation, FAQ.
 
 ## How it works
 
