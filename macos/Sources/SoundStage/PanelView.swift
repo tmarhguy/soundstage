@@ -18,11 +18,29 @@ enum CaptureTheme {
 
 struct PanelView: View {
     @EnvironmentObject var model: AppModel
+    @State private var page: Page = .mixer
+
+    private enum Page {
+        case mixer, settings
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
             Divider()
+            switch page {
+            case .mixer:
+                mixerContent
+            case .settings:
+                SettingsView()
+            }
+        }
+        .padding(14)
+        .frame(width: 360)
+    }
+
+    private var mixerContent: some View {
+        VStack(alignment: .leading, spacing: 12) {
             ForEach(model.devices) { device in
                 DeviceRow(device: device)
             }
@@ -40,31 +58,47 @@ struct PanelView: View {
                 Text("⌃⌥/ · toggle mixer")
                     .font(.caption.monospaced())
                     .foregroundStyle(CaptureTheme.secondary)
-                Button("Menu Bar Settings…") {
-                    AppDelegate.openMenuBarSettings()
-                }
-                .buttonStyle(.borderless)
-                .font(.caption)
-                .foregroundStyle(CaptureTheme.secondary)
             }
         }
-        .padding(14)
-        .frame(width: 360)
     }
 
     private var header: some View {
         HStack {
-            Label("SoundStage", systemImage: "slider.vertical.3")
-                .font(.system(size: 13, weight: .semibold))
-            Spacer()
-            if model.running {
-                Text("live · \(model.devices.isEmpty ? "" : String(format: "%.1f kHz", Engine.shared.sampleRate / 1000))")
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.green)
+            if page == .settings {
+                Button {
+                    page = .mixer
+                } label: {
+                    Label("Settings", systemImage: "chevron.left")
+                        .font(.system(size: 13, weight: .semibold))
+                        .labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(.plain)
+                .help("Back to mixer")
+                Spacer()
             } else {
-                Text("stopped")
-                    .font(.caption.monospaced())
+                Label("SoundStage", systemImage: "slider.vertical.3")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                if model.running {
+                    Text("live · \(model.devices.isEmpty ? "" : String(format: "%.1f kHz", Engine.shared.sampleRate / 1000))")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.green)
+                } else {
+                    Text("stopped")
+                        .font(.caption.monospaced())
+                        .foregroundStyle(CaptureTheme.secondary)
+                }
+                if !CaptureTheme.active && !model.isPreview {
+                    Button {
+                        page = .settings
+                        model.refreshLoginItem()
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .buttonStyle(.plain)
+                    .help("Settings")
                     .foregroundStyle(CaptureTheme.secondary)
+                }
             }
         }
     }
